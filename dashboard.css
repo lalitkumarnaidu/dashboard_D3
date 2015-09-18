@@ -1,0 +1,29 @@
+body {
+  font: 12px sans-serif;
+}
+
+.bar {
+  fill: steelblue;
+  fill-opacity: 0.5;
+}
+
+.chart text {
+  fill: white;
+  font: 10px sans-serif;
+  text-anchor: middle;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+.axis text {
+  fill: blue;
+  font: 10px sans-serif;
+}
+
+.fstyle{
+  font-style: italic;
+}
