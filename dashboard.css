@@ -4,7 +4,7 @@ body {
 
 .bar {
   fill: steelblue;
-  fill-opacity: 0.5;
+  fill-opacity: 1;
 }
 
 .chart text {

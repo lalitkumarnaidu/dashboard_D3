@@ -7,80 +7,185 @@
 <body>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
   <p class= "fstyle">YoYoBlox Network Usage Dashboard</p>
-  <svg class="chart"></svg>
+  <div id='deviceListBox'>
+    <p>Select a device: </p>
+  </div>
+
   <script>
   var vis = {};
   vis.parseDate =  d3.time.format.utc('%Y-%m-%dT%H:%M:%S.%LZ').parse;
+  vis.plotChart = false;
+  vis.updateChart = false;
+  vis.deviceList = [];
   /********************************/
   /*        Chart Layout         */
   /*******************************/
   var margin = {top: 20, right: 20, bottom: 100, left: 100},
   width = 960 - margin.left - margin.right,
   height = 500 - margin.top - margin.bottom;
-  var chart = d3.select(".chart")
+  var chart = d3.select("body")
+  .append("svg")
   .attr("width", width + margin.left + margin.right)
   .attr("height", height + margin.top + margin.bottom)
   .append("g")
   .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  /********************************/
+  /*        Selection Box        */
+  /*******************************/
+  var selectBox = d3.select('#deviceListBox')
+  .append('select')
+  .attr('class','select')
+  .attr('label', 'device:')
+  .on('change',onchange);
   /********************************/
   /*         Scale and Axis      */
   /*******************************/
   var x = d3.time.scale().range([0, width]),
   y = d3.scale.ordinal().rangeRoundBands([height,0], 0.1);
 
+  var xAxis = d3.svg.axis()
+  .scale(x)
+  .orient("bottom");
+  // .tickSize(-height, 0)
+  // .tickSubdivide(true)
+  // .tickPadding(10);
+  var yAxis = d3.svg.axis()
+  .scale(y)
+  .orient("left");
+
   /********************************/
-  /*          Data                */
+  /*          Init Data           */
   /*******************************/
+
   d3.tsv("data.tsv", function(error, data) {
     if (error) throw error;
-    vis.deviceData = data.map(function(d){
-      return {
-        deviceMac: d.dhcpLease_macAddress,
-        category: d.category,
-        startTime: vis.parseDate(d.dateTimeFirstSeen),
-        endTime: new Date((+vis.parseDate(d.dateTimeFirstSeen))+ ((+d.duration)*1000))
-      };
+    vis.Data = data;
+    data.forEach(function(d){
+    if(vis.deviceList.indexOf(d.dhcpLease_macAddress) == -1)
+          vis.deviceList.push(d.dhcpLease_macAddress);
     });
+  /********************************/
+  /*          Selection           */
+  /*******************************/
+    vis.selectBoxOptions = selectBox.selectAll('option')
+                           .data(vis.deviceList)
+                           .enter()
+                           .append('option')
+                           .text(function (d) { return d; });
+  });//end of data.tsv read
+    /********************************/
+    /*   Events                    */
+    /*******************************/
+    function onchange()
+    {
+  	   vis.selectValue = d3.select('select').property('value');
+       vis.plotChart = true;
+       if(vis.updateChart)
+        updateChart(vis.selectValue);
+       else
+        initChart(vis.selectValue);
+    };
 
-    /*************************************/
-    /*   Setting up Scale and Axis      */
-    /************************************/
-    //Verbose lines: for x axis extent of date (+/-) 1 hr
-    x.domain([d3.min(vis.deviceData, function (d) { return new Date(+d.startTime - 3600000); }),
-              d3.max(vis.deviceData, function (d) { return new Date(+d.startTime + 3600000); })]);
-    y.domain(vis.deviceData.map(function(d){ return d.category;}));
-
-      var xAxis = d3.svg.axis()
-      .scale(x)
-      .orient("bottom");
-      // .tickSize(-height, 0)
-      // .tickSubdivide(true)
-      // .tickPadding(10);
-      var yAxis = d3.svg.axis()
-      .scale(y)
-      .orient("left");
-
-      chart.append("g")
-      .attr("class", "x axis")
-      .attr("transform", "translate(0," + height + ")")
-      .call(xAxis);
-
-      chart.append("g")
-      .attr("class", "y axis")
-      .call(yAxis);
-
+    function initChart(s){
       /********************************/
-      /*   Appending Progress Bar    */
+      /*          Data                */
       /*******************************/
-      chart.selectAll(".bar")
-           .data(vis.deviceData)
-           .enter().append("rect")
-           .attr("class", "bar")
-           .attr("x", function(d) {return x(d.startTime); })
-           .attr("y", function(d) { return y(d.category); })
-           .attr("height", y.rangeBand())
-           .attr("width", function(d) { return x(d.endTime) - x(d.startTime); });
+      vis.updateChart = true;
+      vis.deviceData = [];
+      (vis.Data).forEach(function(d){
+        if(d.dhcpLease_macAddress == s)
+         {
+           var obj = {
+                   deviceMac: d.dhcpLease_macAddress,
+                   category: d.category,
+                   startTime: vis.parseDate(d.dateTimeFirstSeen),
+                   endTime: new Date((+vis.parseDate(d.dateTimeFirstSeen))+ ((+d.duration)*1000))
+                 };
+           vis.deviceData.push(obj);
+         }
 
-    });
+      });
+      /*************************************/
+      /*   Setting up Scale and Axis      */
+      /************************************/
+      if(vis.plotChart){
+        //Verbose lines: for x axis extent of date (+/-) 1 hr
+        x.domain([d3.min(vis.deviceData, function (d) { return new Date(+d.startTime - 3600000); }),
+          d3.max(vis.deviceData, function (d) { return new Date(+d.startTime + 3600000); })]);
+          y.domain(vis.deviceData.map(function(d){ return d.category;}));
+
+
+          chart.append("g")
+          .attr("class", "x axis")
+          .attr("transform", "translate(0," + height + ")")
+          .call(xAxis);
+
+          chart.append("g")
+          .attr("class", "y axis")
+          .call(yAxis);
+
+          /********************************/
+          /*   Appending Progress Bar    */
+          /*******************************/
+      vis.bars = chart.selectAll(".bar")
+                      .data(vis.deviceData)
+                      .enter().append("rect")
+                      .attr("class", "bar")
+                      .attr("x", function(d) {return x(d.startTime); })
+                      .attr("y", function(d) { return y(d.category); })
+                      .attr("height", y.rangeBand())
+                      .attr("width", function(d) { return x(d.endTime) - x(d.startTime); });
+        }//end of if statement
+    }
+
+    function updateChart(s){
+      /********************************/
+      /*         Update Data          */
+      /*******************************/
+      vis.deviceData = [];
+      (vis.Data).forEach(function(d){
+        if(d.dhcpLease_macAddress == s)
+         {
+           var obj = {
+                   deviceMac: d.dhcpLease_macAddress,
+                   category: d.category,
+                   startTime: vis.parseDate(d.dateTimeFirstSeen),
+                   endTime: new Date((+vis.parseDate(d.dateTimeFirstSeen))+ ((+d.duration)*1000))
+                 };
+           vis.deviceData.push(obj);
+         }
+      });
+
+      /*************************************/
+      /*   Update Scale and Axis           */
+      /************************************/
+      if(vis.plotChart){
+        //Verbose lines: for x axis extent of date (+/-) 1 hr
+          x.domain([d3.min(vis.deviceData, function (d) { return new Date(+d.startTime - 3600000); }),
+          d3.max(vis.deviceData, function (d) { return new Date(+d.startTime + 3600000); })]);
+          y.domain(vis.deviceData.map(function(d){ return d.category;}));
+
+        vis.bars.remove();
+        var c = chart.transition();
+
+        vis.bars = chart.selectAll(".bar")
+                        .data(vis.deviceData)
+                        .enter().append("rect")
+                        .attr("class", "bar")
+                        .attr("x", function(d) {return x(d.startTime); })
+                        .attr("y", function(d) { return y(d.category); })
+                        .attr("height", y.rangeBand())
+                        .attr("width", function(d) { return x(d.endTime) - x(d.startTime); });
+
+        c.select("g.x.axis") // change the x axis
+            .duration(750)
+            .call(xAxis);
+
+        c.select("g.y.axis") // change the y axis
+            .duration(750)
+            .call(yAxis);
+      }//end of if statement
+    }
     </script>
     </html>
